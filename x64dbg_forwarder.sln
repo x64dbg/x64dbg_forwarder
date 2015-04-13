@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bridge", "bridge\bridge.vcxproj", "{800B0E3B-30E7-4033-AA89-85EA64757C9B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dbg", "dbg\dbg.vcxproj", "{2449E0FB-C72E-4BB2-A775-3948F9D2E73F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{800B0E3B-30E7-4033-AA89-85EA64757C9B}.Release|Win32.ActiveCfg = Release|Win32
+		{800B0E3B-30E7-4033-AA89-85EA64757C9B}.Release|Win32.Build.0 = Release|Win32
+		{800B0E3B-30E7-4033-AA89-85EA64757C9B}.Release|x64.ActiveCfg = Release|x64
+		{800B0E3B-30E7-4033-AA89-85EA64757C9B}.Release|x64.Build.0 = Release|x64
+		{2449E0FB-C72E-4BB2-A775-3948F9D2E73F}.Release|Win32.ActiveCfg = Release|Win32
+		{2449E0FB-C72E-4BB2-A775-3948F9D2E73F}.Release|Win32.Build.0 = Release|Win32
+		{2449E0FB-C72E-4BB2-A775-3948F9D2E73F}.Release|x64.ActiveCfg = Release|x64
+		{2449E0FB-C72E-4BB2-A775-3948F9D2E73F}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

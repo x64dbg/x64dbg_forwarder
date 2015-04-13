@@ -1,0 +1,7 @@
+bin/
+Release/
+x64/
+ipch/
+*.sdf
+*.suo
+*.user
