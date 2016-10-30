@@ -24,7 +24,6 @@
 #pragma comment(linker, "/export:DbgFunctionOverlaps=x64bridge.DbgFunctionOverlaps")
 #pragma comment(linker, "/export:DbgFunctions=x64bridge.DbgFunctions")
 #pragma comment(linker, "/export:DbgGetBookmarkAt=x64bridge.DbgGetBookmarkAt")
-#pragma comment(linker, "/export:DbgGetBpList=x64bridge.DbgGetBpList")
 #pragma comment(linker, "/export:DbgGetBpxTypeAt=x64bridge.DbgGetBpxTypeAt")
 #pragma comment(linker, "/export:DbgGetBranchDestination=x64bridge.DbgGetBranchDestination")
 #pragma comment(linker, "/export:DbgGetCommentAt=x64bridge.DbgGetCommentAt")
@@ -34,7 +33,6 @@
 #pragma comment(linker, "/export:DbgGetModuleAt=x64bridge.DbgGetModuleAt")
 #pragma comment(linker, "/export:DbgGetRegDump=x64bridge.DbgGetRegDump")
 #pragma comment(linker, "/export:DbgGetStringAt=x64bridge.DbgGetStringAt")
-#pragma comment(linker, "/export:DbgGetThreadList=x64bridge.DbgGetThreadList")
 #pragma comment(linker, "/export:DbgInit=x64bridge.DbgInit")
 #pragma comment(linker, "/export:DbgIsBpDisabled=x64bridge.DbgIsBpDisabled")
 #pragma comment(linker, "/export:DbgIsDebugging=x64bridge.DbgIsDebugging")
@@ -163,7 +161,6 @@
 #pragma comment(linker, "/export:DbgFunctionOverlaps=x32bridge.DbgFunctionOverlaps")
 #pragma comment(linker, "/export:DbgFunctions=x32bridge.DbgFunctions")
 #pragma comment(linker, "/export:DbgGetBookmarkAt=x32bridge.DbgGetBookmarkAt")
-#pragma comment(linker, "/export:DbgGetBpList=x32bridge.DbgGetBpList")
 #pragma comment(linker, "/export:DbgGetBpxTypeAt=x32bridge.DbgGetBpxTypeAt")
 #pragma comment(linker, "/export:DbgGetBranchDestination=x32bridge.DbgGetBranchDestination")
 #pragma comment(linker, "/export:DbgGetCommentAt=x32bridge.DbgGetCommentAt")
@@ -173,7 +170,6 @@
 #pragma comment(linker, "/export:DbgGetModuleAt=x32bridge.DbgGetModuleAt")
 #pragma comment(linker, "/export:DbgGetRegDump=x32bridge.DbgGetRegDump")
 #pragma comment(linker, "/export:DbgGetStringAt=x32bridge.DbgGetStringAt")
-#pragma comment(linker, "/export:DbgGetThreadList=x32bridge.DbgGetThreadList")
 #pragma comment(linker, "/export:DbgInit=x32bridge.DbgInit")
 #pragma comment(linker, "/export:DbgIsBpDisabled=x32bridge.DbgIsBpDisabled")
 #pragma comment(linker, "/export:DbgIsDebugging=x32bridge.DbgIsDebugging")
@@ -277,3 +273,220 @@
 #pragma comment(linker, "/export:GuiUpdateThreadView=x32bridge.GuiUpdateThreadView")
 #pragma comment(linker, "/export:GuiUpdateWindowTitle=x32bridge.GuiUpdateWindowTitle")
 #endif //_WIN64
+
+//Fixes for https://github.com/x64dbg/x64dbg/issues/1202
+
+#include <windows.h>
+
+#define MAX_THREAD_NAME_SIZE 256
+#define MAX_BREAKPOINT_SIZE 256
+#define MAX_MODULE_SIZE 256
+#define MAX_CONDITIONAL_EXPR_SIZE 256
+#define MAX_CONDITIONAL_TEXT_SIZE 256
+
+typedef ULONG_PTR duint;
+
+typedef enum
+{
+    _PriorityIdle = -15,
+    _PriorityAboveNormal = 1,
+    _PriorityBelowNormal = -1,
+    _PriorityHighest = 2,
+    _PriorityLowest = -2,
+    _PriorityNormal = 0,
+    _PriorityTimeCritical = 15,
+    _PriorityUnknown = 0x7FFFFFFF
+} THREADPRIORITY;
+
+typedef enum
+{
+    _Executive = 0,
+    _FreePage = 1,
+    _PageIn = 2,
+    _PoolAllocation = 3,
+    _DelayExecution = 4,
+    _Suspended = 5,
+    _UserRequest = 6,
+    _WrExecutive = 7,
+    _WrFreePage = 8,
+    _WrPageIn = 9,
+    _WrPoolAllocation = 10,
+    _WrDelayExecution = 11,
+    _WrSuspended = 12,
+    _WrUserRequest = 13,
+    _WrEventPair = 14,
+    _WrQueue = 15,
+    _WrLpcReceive = 16,
+    _WrLpcReply = 17,
+    _WrVirtualMemory = 18,
+    _WrPageOut = 19,
+    _WrRendezvous = 20,
+    _Spare2 = 21,
+    _Spare3 = 22,
+    _Spare4 = 23,
+    _Spare5 = 24,
+    _WrCalloutStack = 25,
+    _WrKernel = 26,
+    _WrResource = 27,
+    _WrPushLock = 28,
+    _WrMutex = 29,
+    _WrQuantumEnd = 30,
+    _WrDispatchInt = 31,
+    _WrPreempted = 32,
+    _WrYieldExecution = 33,
+    _WrFastMutex = 34,
+    _WrGuardedMutex = 35,
+    _WrRundown = 36,
+} THREADWAITREASON;
+
+typedef enum
+{
+    bp_none = 0,
+    bp_normal = 1,
+    bp_hardware = 2,
+    bp_memory = 4
+} BPXTYPE;
+
+typedef struct
+{
+    int ThreadNumber;
+    HANDLE Handle;
+    DWORD ThreadId;
+    duint ThreadStartAddress;
+    duint ThreadLocalBase;
+    char threadName[MAX_THREAD_NAME_SIZE];
+} THREADINFO;
+
+typedef struct
+{
+    THREADINFO BasicInfo;
+    duint ThreadCip;
+    DWORD SuspendCount;
+    THREADPRIORITY Priority;
+    THREADWAITREASON WaitReason;
+    DWORD LastError;
+} THREADALLINFO;
+
+typedef struct
+{
+    int count;
+    THREADALLINFO* list;
+    int CurrentThread;
+} THREADLIST;
+
+typedef struct
+{
+    THREADINFO BasicInfo;
+    duint ThreadCip;
+    DWORD SuspendCount;
+    THREADPRIORITY Priority;
+    THREADWAITREASON WaitReason;
+    DWORD LastError;
+
+    FILETIME UserTime;
+    FILETIME KernelTime;
+    FILETIME CreationTime;
+    ULONG64 Cycles; // Windows Vista or greater
+} THREADALLINFOEX;
+
+typedef struct
+{
+    int count;
+    THREADALLINFOEX* list;
+    int CurrentThread;
+} THREADLISTEX;
+
+typedef struct
+{
+    BPXTYPE type;
+    duint addr;
+    bool enabled;
+    bool singleshoot;
+    bool active;
+    char name[MAX_BREAKPOINT_SIZE];
+    char mod[MAX_MODULE_SIZE];
+    unsigned short slot;
+} BRIDGEBP;
+
+typedef struct
+{
+    int count;
+    BRIDGEBP* bp;
+} BPMAP;
+
+typedef struct
+{
+    BPXTYPE type;
+    duint addr;
+    bool enabled;
+    bool singleshoot;
+    bool active;
+    char name[MAX_BREAKPOINT_SIZE];
+    char mod[MAX_MODULE_SIZE];
+    unsigned short slot;
+    unsigned int hitCount;
+    bool fastResume;
+    bool silent;
+    char breakCondition[MAX_CONDITIONAL_EXPR_SIZE];
+    char logText[MAX_CONDITIONAL_TEXT_SIZE];
+    char logCondition[MAX_CONDITIONAL_EXPR_SIZE];
+    char commandText[MAX_CONDITIONAL_TEXT_SIZE];
+    char commandCondition[MAX_CONDITIONAL_EXPR_SIZE];
+} BRIDGEBPEX;
+
+typedef struct
+{
+    int count;
+    BRIDGEBPEX* bp;
+} BPMAPEX;
+
+typedef void* (*BRIDGEALLOC)(duint);
+typedef void (*BRIDGEFREE)(void*);
+typedef void (*DBGGETTHREADLISTEX)(THREADLISTEX*);
+typedef int (*DBGGETBPLISTEX)(BPXTYPE, BPMAPEX*);
+
+extern "C" __declspec(dllexport) void DbgGetThreadList(THREADLIST* list)
+{
+#ifdef _WIN64
+    static HMODULE hBridge = LoadLibraryW(L"x64bridge.dll");
+#else
+    static HMODULE hBridge = LoadLibraryW(L"x32bridge.dll");
+#endif //_WIN64
+    static DBGGETTHREADLISTEX DbgGetThreadListEx = (DBGGETTHREADLISTEX)GetProcAddress(hBridge, "DbgGetThreadList");
+    static BRIDGEALLOC BridgeAlloc = (BRIDGEALLOC)GetProcAddress(hBridge, "BridgeAlloc");
+    static BRIDGEFREE BridgeFree = (BRIDGEFREE)GetProcAddress(hBridge, "BridgeFree");
+    THREADLISTEX listEx;
+    DbgGetThreadListEx(&listEx);
+    list->count = listEx.count;
+    if(list->count <= 0)
+        return;
+    list->list = (THREADALLINFO*)BridgeAlloc(list->count * sizeof(THREADALLINFO));
+    for(int i = 0; i < list->count; i++)
+        for(size_t j = 0; j < sizeof(THREADALLINFO); j++)
+            ((unsigned char*)&list->list[i])[j] = ((unsigned char*)&listEx.list[i])[j];
+    BridgeFree(listEx.list);
+    list->CurrentThread = listEx.CurrentThread;
+}
+
+extern "C" __declspec(dllexport) int DbgGetBpList(BPXTYPE type, BPMAP* list)
+{
+#ifdef _WIN64
+    static HMODULE hBridge = LoadLibraryW(L"x64bridge.dll");
+#else
+    static HMODULE hBridge = LoadLibraryW(L"x32bridge.dll");
+#endif //_WIN64
+    static DBGGETBPLISTEX DbgGetBpListEx = (DBGGETBPLISTEX)GetProcAddress(hBridge, "DbgGetBpList");
+    static BRIDGEALLOC BridgeAlloc = (BRIDGEALLOC)GetProcAddress(hBridge, "BridgeAlloc");
+    static BRIDGEFREE BridgeFree = (BRIDGEFREE)GetProcAddress(hBridge, "BridgeFree");
+    BPMAPEX listEx;
+    DbgGetBpListEx(type, &listEx);
+    list->count = listEx.count;
+    if(!list->count)
+        return 0;
+    list->bp = (BRIDGEBP*)BridgeAlloc(list->count * sizeof(BRIDGEBP));
+    for(int i = 0; i < list->count; i++)
+        for(size_t j = 0; j < sizeof(BRIDGEBP); j++)
+            ((unsigned char*)&list->bp[i])[j] = ((unsigned char*)&listEx.bp[i])[j];
+    BridgeFree(listEx.bp);
+    return list->count;
+}
